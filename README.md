@@ -1,308 +1,148 @@
-# 🎬 AI 콘텐츠 마케팅 팀
+# 멀티 에이전트 마케팅 웹 도구 (로컬 PoC) - ENV 설정 가이드
 
-> YouTube 영상 또는 웹사이트 URL 하나로 **모든 플랫폼의 마케팅 콘텐츠를 자동 생성**하는 AI 시스템
+이 프로젝트는 로컬에서 동작하는 무인증 PoC 웹 도구입니다.  
+마케터가 URL 1개를 입력하면 콘텐츠 생성 파이프라인을 실행하고 결과물을 `outputs/`에 저장합니다.
 
-<br>
+## 1) 사전 요구사항
 
-## 📌 이게 뭔가요?
+- Python 3.10+
+- `ffmpeg` / `ffprobe` 설치
+- 인터넷 연결 (실제 URL 수집, 모델/API 호출 시)
+- 선택 사항:
+  - OpenAI API Key
+  - Anthropic API Key
+  - Nanobanana API URL/Key (비주얼 실제 생성용)
 
-YouTube 영상 링크나 블로그 글 URL만 붙여넣으면, AI가 자동으로 다양한 플랫폼에 맞는 콘텐츠를 만들어줍니다.
+## 2) 설치
 
-**👉 하나의 콘텐츠 → 10가지 다른 형태로 자동 변환!**
-
-<br>
-
-## ✨ 뭘 만들어주나요?
-
-### 📝 텍스트 콘텐츠 (6종)
-- **뉴스레터** - 15,000자 분량의 깊이 있는 인터뷰 형식
-- **블로그 글** - SEO 최적화된 3,000~5,000자 포스팅
-- **유튜브 영상 대본** - 타임스탬프와 화면 구성 포함
-- **X(트위터) 스레드** - 280자 이내 스레드 10개
-- **LinkedIn 포스트** - 전문가 톤의 1,500자 포스트
-- **쇼츠 대본** - 60초 짧은 영상 대본 3개
-
-### 🎨 비주얼 콘텐츠 (2종)
-- **카드뉴스** - 인스타그램용 5~7장 슬라이드
-- **썸네일** - 유튜브 썸네일 이미지
-
-### 🎥 영상 콘텐츠 (1종)
-- **쇼츠 영상** - 9:16 비율의 짧은 영상 3개 자동 편집
-
-<br>
-
----
-
-<br>
-
-## 🚀 어떻게 사용하나요?
-
-### 1️⃣ GitHub에서 다운로드하기
-
-1. 이 페이지 상단의 **초록색 `Code` 버튼** 클릭
-2. **`Download ZIP`** 선택
-3. 다운로드한 파일 압축 풀기
-
-또는 터미널에서:
 ```bash
-git clone https://github.com/uxjoseph/content-marketing-team.git
+cd /Users/limchaesung/Github/team-auruda/content-marketing-team
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-<br>
+## 3) ENV 파일 생성
 
-### 2️⃣ Claude Code 열기
+`.env.example`을 복사해 `.env`를 만드세요.
 
-1. **[Claude Code](https://code.claude.com/)** 접속 (무료 계정 필요)
-2. 왼쪽 상단 **"Open Folder"** 클릭
-3. 다운로드한 `content-marketing-team` 폴더 선택
-
-<br>
-
-### 3️⃣ 콘텐츠 생성하기
-
-채팅창에 이렇게 입력하세요:
-
-```
-이 YouTube 영상으로 콘텐츠 만들어줘:
-https://www.youtube.com/watch?v=영상ID
+```bash
+cp .env.example .env
 ```
 
-또는
+## 4) 필수/권장 ENV 값
 
-```
-이 블로그 글로 콘텐츠 만들어줘:
-https://example.com/blog/article
-```
+아래 항목을 우선 설정하세요.
 
-**그게 끝입니다!** ✅
+### 공통
 
-AI가 자동으로:
-1. 영상/글 내용 분석
-2. 핵심 메시지 추출
-3. 10가지 콘텐츠 자동 생성
-4. `outputs/` 폴더에 저장
+- `APP_NAME`: 앱 이름
+- `DATABASE_URL`: SQLite 경로 (기본값 사용 가능)
+- `OUTPUT_ROOT`: 결과물 저장 경로
+- `RETENTION_DAYS`: 자동 정리 보관일 (기본 7)
+- `MAX_JOBS`: 최대 보관 작업 수 (기본 200)
+- `WORKER_POLL_SECONDS`: 워커 폴링 주기
 
-<br>
+### 기본 콘텐츠 옵션
 
-### 4️⃣ 결과물 확인하기
+- `DEFAULT_LANGUAGE`: 기본 언어 (권장 `ko`)
+- `DEFAULT_TONE`: 기본 톤
+- `DEFAULT_TARGETS`: 기본 타겟 목록  
+  기본값은 `shorts-videos` 제외 상태입니다.
 
-생성된 파일은 `outputs/` 폴더에서 확인할 수 있어요:
+### LLM
 
-```
-outputs/
-├── brief.md              ← 원본 분석 및 기획서
-├── newsletter.md         ← 뉴스레터
-├── blog.md              ← 블로그 글
-├── youtube-script.md    ← 유튜브 대본
-├── linkedin.md          ← 링크드인 포스트
-├── threads/             ← X(트위터) 스레드 10개
-│   ├── thread-01.md
-│   └── ...
-├── shorts-scripts/      ← 쇼츠 대본 3개
-│   ├── shorts-01.md
-│   └── ...
-├── visuals/             ← 이미지 (카드뉴스, 썸네일)
-└── shorts-videos/       ← 편집된 쇼츠 영상 3개
-```
+- `LLM_PROVIDER`: 기본 제공자 이름 (`openai` 또는 `anthropic`)
+- `OPENAI_API_KEY`, `OPENAI_MODEL`
+- `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
 
-<br>
+둘 중 하나만 유효해도 텍스트 생성이 가능하며, 둘 다 없으면 mock fallback 텍스트가 생성됩니다.
 
----
+### Nanobanana (비주얼)
 
-<br>
+- `NANOBANANA_API_URL`: 이미지 생성 API 엔드포인트
+- `NANOBANANA_API_KEY`: API 키
+- `NANOBANANA_MODEL`: 모델명
 
-## 💡 실제 사용 예시
+값이 없으면 비주얼 단계가 실패하고 작업은 `PARTIAL_SUCCESS`가 될 수 있습니다.  
+`mock_mode=true` 작업은 플레이스홀더 PNG를 생성합니다.
 
-### 예시 1: YouTube 영상 → 콘텐츠 생성
+### Whisper
 
-**입력:**
-```
-이 영상으로 콘텐츠 만들어줘:
-https://www.youtube.com/watch?v=dQw4w9WgXcQ
+- `WHISPER_MODEL` (예: `small`)
+- `WHISPER_DEVICE` (예: `cpu`)
+- `WHISPER_COMPUTE_TYPE` (예: `int8`)
+- `REQUEST_TIMEOUT_SECONDS`
+
+## 5) 실행
+
+단일 워커로 실행하세요.
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 ```
 
-**결과:**
-- ✅ 뉴스레터 1개
-- ✅ 블로그 글 1개
-- ✅ 유튜브 대본 1개
-- ✅ X 스레드 10개
-- ✅ 링크드인 포스트 1개
-- ✅ 쇼츠 대본 3개
-- ✅ 카드뉴스 5~7장
-- ✅ 썸네일 1개
-- ✅ 쇼츠 영상 3개
+접속:
 
-**소요 시간:** 약 5~10분
+- UI: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
 
-<br>
+## 6) mock 모드와 실제 모드
 
-### 예시 2: 특정 콘텐츠만 생성하고 싶을 때
+### mock 모드
 
-```
-이 영상으로 X 스레드 10개만 만들어줘:
-https://www.youtube.com/watch?v=...
-```
+- 작업 생성 시 `mock_mode=true`
+- 외부 API 키 없이 동작 확인 가능
+- 비주얼/영상은 테스트용 산출물 생성
 
-```
-이 글로 카드뉴스만 만들어줘:
-https://blog.example.com/article
-```
+### 실제 모드
 
-<br>
+- `mock_mode=false`
+- URL 수집/전사/LLM/비주얼 API가 실제 호출됨
+- 시스템 의존성(`ffmpeg`, `yt-dlp`)과 API 키가 필요
 
----
+## 7) 출력 경로
 
-<br>
+작업별 결과물:
 
-## 🎯 어떤 사람들에게 유용한가요?
-
-- **1인 창업가** - 콘텐츠 제작 시간을 90% 단축
-- **마케터** - 하나의 콘텐츠로 모든 채널 커버
-- **크리에이터** - 영상 하나로 10가지 재료 확보
-- **개인 브랜더** - 멀티 플랫폼 운영 자동화
-
-<br>
-
----
-
-<br>
-
-## 🛠 내부 구조 (궁금한 분들만)
-
-### AI 팀 구성
-
-이 시스템은 총 **8명의 AI 에이전트**로 구성되어 있어요:
-
-#### 📋 기획팀 (2명)
-- **Planner** - 콘텐츠 분석 및 기획서 작성
-- **Reviewer** - 품질 검수 및 최종 승인
-
-#### ✍️ 콘텐츠 제작팀 (6명)
-- Newsletter Writer
-- Blog Writer
-- YouTube Scriptwriter
-- Thread Writer
-- LinkedIn Writer
-- Shorts Scriptwriter
-
-#### 🤖 자동화 팀 (2개 스킬)
-- Visual Maker - 카드뉴스, 썸네일 생성
-- Shorts Video Maker - 쇼츠 영상 자동 편집
-
-<br>
-
-### 워크플로우
-
-```
-[URL 입력]
-    ↓
-[Planner가 분석]
-    ↓
-[8명의 AI가 동시 작업]
-    ↓
-[Reviewer가 검수]
-    ↓
-[outputs/ 폴더에 결과물 저장]
+```text
+/Users/limchaesung/Github/team-auruda/content-marketing-team/outputs/{job_id}/
 ```
 
-<br>
+대표 파일:
 
----
+- `brief.md`
+- `blog.md`, `newsletter.md`, `linkedin.md`, `youtube-script.md`
+- `threads/thread-*.md`
+- `shorts-scripts/shorts-*.md`
+- `visuals/card-news/slide-*.png`
+- `visuals/thumbnail.png`
+- `shorts-videos/shorts-*.mp4`
+- `review-report.md`
 
-<br>
+## 8) 최소 동작 확인 (API)
 
-## 📚 더 알아보기
+```bash
+curl -X POST "http://localhost:8000/api/jobs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_url":"https://example.com",
+    "targets":["blog","visuals"],
+    "tone":"친근하고 실용적",
+    "language":"ko",
+    "mock_mode":true
+  }'
+```
 
-### Claude Code란?
-- Anthropic에서 만든 AI 코딩 도구
-- 복잡한 작업을 AI가 자동으로 처리
-- 무료로 사용 가능
-- 웹사이트: https://code.claude.com/
+응답의 `job_id`로 상태 조회:
 
-### 필요한 것들
-- ✅ Claude Code 계정 (무료)
-- ✅ 인터넷 연결
-- ✅ YouTube 링크 또는 웹사이트 URL
+```bash
+curl "http://localhost:8000/api/jobs/{job_id}"
+```
 
-### 비용
-- **무료!** (Claude Code 무료 플랜으로 충분)
-- API 키도 필요 없음
+## 9) 문제 해결
 
-<br>
-
----
-
-<br>
-
-## 🙋‍♂️ 자주 묻는 질문
-
-### Q. 코딩을 전혀 모르는데 사용할 수 있나요?
-**A.** 네! 복사 붙여넣기만 할 수 있으면 사용 가능합니다.
-
-### Q. 영어 콘텐츠도 되나요?
-**A.** 네! 한국어와 영어 모두 지원합니다.
-
-### Q. 모든 콘텐츠를 다 만들어야 하나요?
-**A.** 아니요. 원하는 콘텐츠만 골라서 생성할 수 있어요.
-
-### Q. 생성된 콘텐츠를 수정할 수 있나요?
-**A.** 당연하죠! AI에게 "이 부분 더 짧게 만들어줘" 라고 요청하면 됩니다.
-
-### Q. 오류가 나면 어떻게 하나요?
-**A.** Claude에게 "에러가 났어" 라고 말하면 자동으로 해결합니다.
-
-<br>
-
----
-
-<br>
-
-## 📄 라이선스
-
-MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
-
-<br>
-
----
-
-<br>
-
-## 🎁 보너스 팁
-
-### 더 좋은 결과물을 얻으려면:
-
-1. **구체적인 URL 사용**
-   - ✅ 명확한 주제의 영상/글
-   - ❌ 너무 짧거나 내용이 없는 영상
-
-2. **추가 지시사항 제공**
-   ```
-   이 영상으로 콘텐츠 만들어줘. 
-   타겟은 20대 직장인이고, 톤은 친근하게 해줘:
-   https://...
-   ```
-
-3. **수정 요청**
-   ```
-   블로그 글을 더 전문적인 톤으로 바꿔줘
-   ```
-   ```
-   X 스레드를 더 짧게 만들어줘
-   ```
-
-<br>
-
----
-
-<br>
-
-<div align="center">
-
-### 🌟 이제 시작해보세요!
-
-**하나의 URL → 10가지 콘텐츠**
-
-궁금한 점이 있으면 Issue를 남겨주세요!
-
-</div>
-
+- `ffmpeg not found`: 시스템에 `ffmpeg`/`ffprobe` 설치 필요
+- 비주얼 실패: `NANOBANANA_API_URL`, `NANOBANANA_API_KEY` 확인
+- 쇼츠 실패: YouTube 원본 다운로드 가능 여부/네트워크 확인
+- `PARTIAL_SUCCESS`: `review-report.md`의 실패/경고 섹션 확인

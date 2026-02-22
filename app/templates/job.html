@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job {{ job.id }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <main class="erp-shell">
+    <aside class="erp-sidebar">
+      <div class="erp-brand">ERP Marketing Ops</div>
+      <nav class="erp-nav">
+        <a href="/">작업 대시보드</a>
+        <a href="/prompts">프롬프트 관리</a>
+        <a class="active" href="/jobs/{{ job.id }}">작업 상세</a>
+      </nav>
+    </aside>
+    <section class="erp-main">
+      <header class="erp-topbar">
+        <h1>작업 상세</h1>
+        <a href="/" class="btn btn-secondary">목록으로</a>
+      </header>
+      <div class="erp-content">
+        <section class="card">
+          <h2>실행 상태</h2>
+          <div class="status-grid">
+            <div class="cell"><strong>Job ID</strong><p id="job-id">{{ job.id }}</p></div>
+            <div class="cell"><strong>Status</strong><p><span id="status" class="status-badge status-{{ job.status }}">{{ job.status }}</span></p></div>
+            <div class="cell"><strong>Stage</strong><p id="stage">{{ job.current_stage }}</p></div>
+            <div class="cell"><strong>Progress</strong><p id="progress">{{ job.progress }}%</p></div>
+          </div>
+          <div style="display:flex; gap:0.5rem; margin-top:0.8rem;">
+            <button id="retry-btn" class="btn btn-secondary" type="button">실패 작업 재시도</button>
+            <button id="cancel-btn" class="btn btn-danger" type="button">작업 취소</button>
+          </div>
+          <pre id="error-box">{{ job.error_message or "" }}</pre>
+        </section>
+
+        <section class="card">
+          <h2>산출물</h2>
+          <ul id="artifacts"></ul>
+          <h3>미리보기</h3>
+          <p id="preview-title">목록에서 미리보기 버튼을 누르세요.</p>
+          <div id="preview-shell" class="preview-shell">
+            <article id="markdown-preview" class="markdown-preview"></article>
+            <div id="media-preview" class="media-preview" hidden>
+              <img id="image-preview" class="media-image" alt="image preview" hidden>
+              <video id="video-preview" class="media-video" controls hidden></video>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const jobId = "{{ job.id }}";
+    const statusEl = document.getElementById("status");
+    const stageEl = document.getElementById("stage");
+    const progressEl = document.getElementById("progress");
+    const errorEl = document.getElementById("error-box");
+    const artifactsEl = document.getElementById("artifacts");
+    const previewTitleEl = document.getElementById("preview-title");
+    const previewShellEl = document.getElementById("preview-shell");
+    const previewEl = document.getElementById("markdown-preview");
+    const mediaPreviewEl = document.getElementById("media-preview");
+    const imagePreviewEl = document.getElementById("image-preview");
+    const videoPreviewEl = document.getElementById("video-preview");
+    let openedTextPath = null;
+
+    function encodeArtifactPath(path) {
+      return path.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+    }
+
+    function clearPreview() {
+      previewTitleEl.textContent = "목록에서 미리보기 버튼을 누르세요.";
+      previewEl.innerHTML = "";
+      mediaPreviewEl.hidden = true;
+      imagePreviewEl.hidden = true;
+      imagePreviewEl.removeAttribute("src");
+      videoPreviewEl.hidden = true;
+      videoPreviewEl.pause();
+      videoPreviewEl.removeAttribute("src");
+      videoPreviewEl.load();
+      openedTextPath = null;
+      previewShellEl.classList.remove("is-open");
+    }
+
+    async function previewMarkdown(path) {
+      if (openedTextPath === path) {
+        clearPreview();
+        return;
+      }
+      const encoded = encodeArtifactPath(path);
+      const response = await fetch(`/api/jobs/${jobId}/artifacts/${encoded}`);
+      if (!response.ok) {
+        previewTitleEl.textContent = `미리보기 실패: ${path}`;
+        previewEl.textContent = "텍스트 파일을 불러오지 못했습니다.";
+        mediaPreviewEl.hidden = true;
+        previewShellEl.classList.add("is-open");
+        openedTextPath = null;
+        return;
+      }
+      const markdown = await response.text();
+      previewTitleEl.textContent = `미리보기: ${path}`;
+      if (window.marked && typeof window.marked.parse === "function") {
+        previewEl.innerHTML = window.marked.parse(markdown);
+      } else {
+        previewEl.textContent = markdown;
+      }
+      mediaPreviewEl.hidden = true;
+      previewShellEl.classList.add("is-open");
+      openedTextPath = path;
+    }
+
+    function previewImage(path) {
+      const encoded = encodeArtifactPath(path);
+      previewTitleEl.textContent = `미리보기: ${path}`;
+      previewEl.innerHTML = "";
+      videoPreviewEl.hidden = true;
+      videoPreviewEl.pause();
+      videoPreviewEl.removeAttribute("src");
+      videoPreviewEl.load();
+      imagePreviewEl.src = `/api/jobs/${jobId}/artifacts/${encoded}`;
+      imagePreviewEl.hidden = false;
+      mediaPreviewEl.hidden = false;
+      previewShellEl.classList.add("is-open");
+      openedTextPath = null;
+    }
+
+    function previewVideo(path) {
+      const encoded = encodeArtifactPath(path);
+      previewTitleEl.textContent = `미리보기: ${path}`;
+      previewEl.innerHTML = "";
+      imagePreviewEl.hidden = true;
+      imagePreviewEl.removeAttribute("src");
+      videoPreviewEl.src = `/api/jobs/${jobId}/artifacts/${encoded}`;
+      videoPreviewEl.hidden = false;
+      mediaPreviewEl.hidden = false;
+      previewShellEl.classList.add("is-open");
+      openedTextPath = null;
+    }
+
+    async function refreshJob() {
+      const response = await fetch(`/api/jobs/${jobId}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      statusEl.textContent = data.status;
+      statusEl.className = `status-badge status-${data.status}`;
+      stageEl.textContent = data.current_stage;
+      progressEl.textContent = `${data.progress}%`;
+      errorEl.textContent = data.error_message || "";
+
+      const artifactsResponse = await fetch(`/api/jobs/${jobId}/artifacts`);
+      if (artifactsResponse.ok) {
+        const artifactsData = await artifactsResponse.json();
+        artifactsEl.innerHTML = "";
+        for (const artifact of artifactsData.artifacts) {
+          const li = document.createElement("li");
+          li.className = "artifact-row";
+          const a = document.createElement("a");
+          a.href = `/api/jobs/${jobId}/artifacts/${encodeArtifactPath(artifact.path)}`;
+          a.textContent = `${artifact.path} (${artifact.type}, ${artifact.size} bytes)`;
+          li.appendChild(a);
+          if (artifact.type === "MARKDOWN") {
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.className = "btn btn-secondary";
+            previewButton.textContent = openedTextPath === artifact.path ? "닫기" : "텍스트 열기";
+            previewButton.addEventListener("click", async () => {
+              await previewMarkdown(artifact.path);
+              await refreshJob();
+            });
+            li.appendChild(previewButton);
+          }
+          if (artifact.type === "IMAGE") {
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.className = "btn btn-secondary";
+            previewButton.textContent = "이미지 보기";
+            previewButton.addEventListener("click", () => previewImage(artifact.path));
+            li.appendChild(previewButton);
+          }
+          if (artifact.type === "VIDEO") {
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.className = "btn btn-secondary";
+            previewButton.textContent = "영상 보기";
+            previewButton.addEventListener("click", () => previewVideo(artifact.path));
+            li.appendChild(previewButton);
+          }
+          artifactsEl.appendChild(li);
+        }
+      }
+    }
+
+    document.getElementById("retry-btn").addEventListener("click", async () => {
+      await fetch(`/api/jobs/${jobId}/retry`, {method: "POST"});
+      await refreshJob();
+    });
+
+    document.getElementById("cancel-btn").addEventListener("click", async () => {
+      await fetch(`/api/jobs/${jobId}/cancel`, {method: "POST"});
+      await refreshJob();
+    });
+
+    refreshJob();
+    setInterval(refreshJob, 2000);
+  </script>
+</body>
+</html>

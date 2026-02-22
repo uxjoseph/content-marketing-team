@@ -1,0 +1,14 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+sqlmodel==0.0.24
+pydantic-settings==2.11.0
+jinja2==3.1.6
+python-multipart==0.0.20
+httpx==0.28.1
+readability-lxml==0.8.4.1
+beautifulsoup4==4.13.5
+yt-dlp==2025.9.26
+faster-whisper==1.2.0
+ffmpeg-python==0.2.0
+Pillow==11.3.0
+pytest==8.4.2

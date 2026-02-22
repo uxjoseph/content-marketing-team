@@ -39,5 +39,5 @@ Thumbs.db
 .env.local
 
 # Outputs (optional - 필요시 주석 해제)
-# outputs/
+outputs/
 
