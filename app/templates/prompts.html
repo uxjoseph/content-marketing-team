@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>프롬프트 운영 관리</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  {% set category_labels = {
+    "planner": "브리핑",
+    "system": "시스템",
+    "task": "텍스트 작업",
+    "visual": "비주얼",
+    "chart": "차트"
+  } %}
+  <main class="erp-shell">
+    <aside class="erp-sidebar">
+      <div class="erp-brand">마케팅 운영 ERP</div>
+      <nav class="erp-nav">
+        <a href="/">작업 대시보드</a>
+        <a class="active" href="/prompts">프롬프트 관리</a>
+      </nav>
+    </aside>
+    <section class="erp-main">
+      <header class="erp-topbar dash-topbar">
+        <div>
+          <p class="dash-kicker">Prompt Ops / Quality Control</p>
+          <h1>프롬프트 운영 관리</h1>
+        </div>
+        <div class="dash-topbar-actions">
+          <span class="status-badge">총 {{ prompts|length }}개</span>
+          <a href="/" class="btn btn-secondary">대시보드로 이동</a>
+        </div>
+      </header>
+      <div class="erp-content prompts-page-content">
+        <section class="card shad-card">
+          {% if updated_key %}
+          <p class="success">저장 완료: <code>{{ updated_key }}</code></p>
+          {% endif %}
+          <p>저장 즉시 다음 작업부터 반영됩니다. 대량 수정 시 검색/카테고리 필터를 활용하세요.</p>
+          <div class="prompt-overview">
+            <span class="pill pill-muted">브리핑/시스템/텍스트/비주얼/차트 프롬프트 통합 관리</span>
+            <span id="visible-count" class="pill">표시 중 {{ prompts|length }}개</span>
+          </div>
+        </section>
+
+        <section class="card shad-card">
+          <div class="prompt-toolbar">
+            <div class="prompt-toolbar-field">
+              <label for="prompt-search">검색</label>
+              <input id="prompt-search" class="input shad-input" type="text" placeholder="이름, 키, 설명으로 검색">
+            </div>
+            <div class="prompt-toolbar-field">
+              <label for="prompt-category">카테고리</label>
+              <select id="prompt-category" class="input shad-input">
+                <option value="">전체 카테고리</option>
+                <option value="planner">브리핑</option>
+                <option value="system">시스템</option>
+                <option value="task">텍스트 작업</option>
+                <option value="visual">비주얼</option>
+                <option value="chart">차트</option>
+              </select>
+            </div>
+            <div class="prompt-toolbar-actions">
+              <button id="expand-all" type="button" class="btn btn-secondary">전체 열기</button>
+              <button id="collapse-all" type="button" class="btn btn-secondary">전체 닫기</button>
+            </div>
+          </div>
+
+          <ul class="prompt-list">
+            {% for prompt in prompts %}
+            {% set category = prompt.key.split(".")[0] %}
+            <li class="prompt-item shad-card"
+                data-key="{{ prompt.key|lower }}"
+                data-label="{{ prompt.label|lower }}"
+                data-description="{{ prompt_descriptions.get(prompt.key, '')|lower }}"
+                data-category="{{ category }}">
+              <div class="prompt-item-head">
+                <div>
+                  <h3>{{ prompt.label }}</h3>
+                  <div class="prompt-item-meta">
+                    <span class="pill pill-muted">{{ category_labels.get(category, category) }}</span>
+                    <code>{{ prompt.key }}</code>
+                    <span>마지막 수정: {{ prompt.updated_at }}</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-secondary prompt-toggle" data-target="editor-{{ loop.index }}">열기</button>
+              </div>
+              <p class="prompt-description">{{ prompt_descriptions.get(prompt.key, "이 프롬프트는 생성 파이프라인에서 사용됩니다.") }}</p>
+
+              <div id="editor-{{ loop.index }}" class="prompt-editor" hidden>
+                <form method="post" action="/prompts/{{ prompt.key }}" class="form-grid prompt-form" data-key="{{ prompt.key }}">
+                  <div class="prompt-editor-top">
+                    <span class="prompt-length">길이: <strong data-length-for="{{ prompt.key }}">0</strong>자</span>
+                    <button type="button" class="btn btn-secondary prompt-copy-key" data-copy="{{ prompt.key }}">키 복사</button>
+                  </div>
+                  <textarea name="content" rows="10" class="textarea shad-input prompt-textarea" data-key="{{ prompt.key }}">{{ prompt.content }}</textarea>
+                  <div class="prompt-actions">
+                    <button class="btn btn-primary prompt-save" type="submit" disabled>저장</button>
+                    <button type="button" class="btn btn-secondary prompt-reset">변경 취소</button>
+                  </div>
+                </form>
+
+                <section class="prompt-variable-panel">
+                  {% set variable_items = prompt_variables_by_key.get(prompt.key, []) %}
+                  <div class="prompt-variable-head">
+                    <h4>템플릿 변수</h4>
+                    <span class="pill pill-muted">{{ variable_items|length }}개</span>
+                  </div>
+                  <p class="prompt-variable-help">
+                    `입력 필수`는 요청값을 그대로 사용하고, `입력 + 기본값`은 값이 없을 때 기본값을 사용합니다.
+                    `AI 생성`은 입력 컨텍스트를 기반으로 생성됩니다.
+                  </p>
+
+                  <ul class="prompt-variable-list">
+                    {% for variable in variable_items %}
+                    <li class="prompt-variable-item">
+                      <form method="post" action="/prompts/{{ prompt.key }}/variables/upsert" class="prompt-variable-form">
+                        <div class="prompt-variable-grid">
+                          <div class="prompt-variable-cell">
+                            <label>변수명</label>
+                            <input class="input shad-input" type="text" name="name" value="{{ variable.name }}" readonly>
+                          </div>
+                          <div class="prompt-variable-cell">
+                            <label>타입</label>
+                            <select class="input shad-input" name="value_type">
+                              {% for value_type in prompt_variable_types %}
+                              <option value="{{ value_type }}" {% if variable.value_type == value_type %}selected{% endif %}>
+                                {{ prompt_variable_type_labels.get(value_type, value_type) }}
+                              </option>
+                              {% endfor %}
+                            </select>
+                          </div>
+                          <div class="prompt-variable-cell">
+                            <label>정렬</label>
+                            <input class="input shad-input" type="number" step="1" name="sort_order" value="{{ variable.sort_order }}">
+                          </div>
+                          <div class="prompt-variable-cell prompt-variable-cell-wide">
+                            <label>기본값</label>
+                            <input class="input shad-input" type="text" name="default_value" value="{{ variable.default_value }}">
+                          </div>
+                          <div class="prompt-variable-cell prompt-variable-cell-wide">
+                            <label>설명</label>
+                            <input class="input shad-input" type="text" name="description" value="{{ variable.description }}">
+                          </div>
+                          <div class="prompt-variable-cell prompt-variable-cell-full">
+                            <label>AI 생성 지시</label>
+                            <textarea class="textarea shad-input" name="ai_instruction" rows="3">{{ variable.ai_instruction }}</textarea>
+                          </div>
+                        </div>
+                        <div class="prompt-variable-actions">
+                          <button class="btn btn-primary" type="submit">변수 저장</button>
+                          <button
+                            class="btn btn-danger"
+                            type="submit"
+                            formaction="/prompts/{{ prompt.key }}/variables/delete"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </form>
+                    </li>
+                    {% else %}
+                    <li class="prompt-variable-empty">등록된 변수가 없습니다.</li>
+                    {% endfor %}
+                  </ul>
+
+                  <details class="prompt-variable-add">
+                    <summary>변수 추가</summary>
+                    <form method="post" action="/prompts/{{ prompt.key }}/variables/upsert" class="prompt-variable-form prompt-variable-form-add">
+                      <div class="prompt-variable-grid">
+                        <div class="prompt-variable-cell">
+                          <label>변수명</label>
+                          <input class="input shad-input" type="text" name="name" placeholder="example_var" required>
+                        </div>
+                        <div class="prompt-variable-cell">
+                          <label>타입</label>
+                          <select class="input shad-input" name="value_type">
+                            {% for value_type in prompt_variable_types %}
+                            <option value="{{ value_type }}">{{ prompt_variable_type_labels.get(value_type, value_type) }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="prompt-variable-cell">
+                          <label>정렬</label>
+                          <input class="input shad-input" type="number" step="1" name="sort_order" value="100">
+                        </div>
+                        <div class="prompt-variable-cell prompt-variable-cell-wide">
+                          <label>기본값</label>
+                          <input class="input shad-input" type="text" name="default_value" value="">
+                        </div>
+                        <div class="prompt-variable-cell prompt-variable-cell-wide">
+                          <label>설명</label>
+                          <input class="input shad-input" type="text" name="description" value="">
+                        </div>
+                        <div class="prompt-variable-cell prompt-variable-cell-full">
+                          <label>AI 생성 지시</label>
+                          <textarea class="textarea shad-input" name="ai_instruction" rows="3"></textarea>
+                        </div>
+                      </div>
+                      <div class="prompt-variable-actions">
+                        <button class="btn btn-primary" type="submit">변수 추가</button>
+                      </div>
+                    </form>
+                  </details>
+                </section>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          <p id="prompt-empty" class="prompt-empty" hidden>조건에 맞는 프롬프트가 없습니다.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById("prompt-search");
+    const categorySelect = document.getElementById("prompt-category");
+    const expandAllBtn = document.getElementById("expand-all");
+    const collapseAllBtn = document.getElementById("collapse-all");
+    const visibleCountEl = document.getElementById("visible-count");
+    const emptyStateEl = document.getElementById("prompt-empty");
+    const promptItems = Array.from(document.querySelectorAll(".prompt-item"));
+    const forms = Array.from(document.querySelectorAll(".prompt-form"));
+    const updatedKey = "{{ updated_key or '' }}";
+
+    const initialValueMap = new Map();
+
+    function updateLength(textarea) {
+      const key = textarea.dataset.key;
+      const target = document.querySelector(`[data-length-for="${CSS.escape(key)}"]`);
+      if (!target) {
+        return;
+      }
+      target.textContent = String(textarea.value.length);
+    }
+
+    function refreshFormState(form) {
+      const textarea = form.querySelector(".prompt-textarea");
+      const saveButton = form.querySelector(".prompt-save");
+      const key = form.dataset.key;
+      const changed = textarea.value !== (initialValueMap.get(key) || "");
+      saveButton.disabled = !changed;
+      form.classList.toggle("is-dirty", changed);
+      updateLength(textarea);
+    }
+
+    function toggleEditor(button, open) {
+      const targetId = button.dataset.target;
+      const editor = document.getElementById(targetId);
+      if (!editor) {
+        return;
+      }
+      const nextState = typeof open === "boolean" ? open : editor.hidden;
+      editor.hidden = !nextState;
+      button.textContent = nextState ? "닫기" : "열기";
+    }
+
+    function applyFilter() {
+      const query = (searchInput.value || "").trim().toLowerCase();
+      const category = categorySelect.value;
+      let visible = 0;
+      promptItems.forEach((item) => {
+        const haystack = `${item.dataset.key} ${item.dataset.label} ${item.dataset.description}`;
+        const matchQuery = !query || haystack.includes(query);
+        const matchCategory = !category || item.dataset.category === category;
+        const show = matchQuery && matchCategory;
+        item.hidden = !show;
+        if (show) {
+          visible += 1;
+        }
+      });
+      visibleCountEl.textContent = `표시 중 ${visible}개`;
+      emptyStateEl.hidden = visible > 0;
+    }
+
+    document.querySelectorAll(".prompt-toggle").forEach((button) => {
+      button.addEventListener("click", () => toggleEditor(button));
+    });
+
+    forms.forEach((form) => {
+      const textarea = form.querySelector(".prompt-textarea");
+      const key = form.dataset.key;
+      initialValueMap.set(key, textarea.value);
+      refreshFormState(form);
+
+      textarea.addEventListener("input", () => {
+        refreshFormState(form);
+      });
+
+      form.querySelector(".prompt-reset").addEventListener("click", () => {
+        textarea.value = initialValueMap.get(key) || "";
+        refreshFormState(form);
+      });
+    });
+
+    document.querySelectorAll(".prompt-copy-key").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const value = button.dataset.copy || "";
+        try {
+          await navigator.clipboard.writeText(value);
+          const oldText = button.textContent;
+          button.textContent = "복사됨";
+          setTimeout(() => {
+            button.textContent = oldText;
+          }, 1100);
+        } catch (_error) {
+          button.textContent = "복사 실패";
+          setTimeout(() => {
+            button.textContent = "키 복사";
+          }, 1100);
+        }
+      });
+    });
+
+    searchInput.addEventListener("input", applyFilter);
+    categorySelect.addEventListener("change", applyFilter);
+
+    expandAllBtn.addEventListener("click", () => {
+      document.querySelectorAll(".prompt-toggle").forEach((button) => toggleEditor(button, true));
+    });
+
+    collapseAllBtn.addEventListener("click", () => {
+      document.querySelectorAll(".prompt-toggle").forEach((button) => toggleEditor(button, false));
+    });
+
+    if (updatedKey) {
+      const targetForm = document.querySelector(`.prompt-form[data-key="${CSS.escape(updatedKey)}"]`);
+      if (targetForm) {
+        const item = targetForm.closest(".prompt-item");
+        const toggleButton = item.querySelector(".prompt-toggle");
+        if (toggleButton) {
+          toggleEditor(toggleButton, true);
+        }
+        item.classList.add("prompt-item-updated");
+        setTimeout(() => item.classList.remove("prompt-item-updated"), 1800);
+      }
+    }
+
+    applyFilter();
+  </script>
+</body>
+</html>

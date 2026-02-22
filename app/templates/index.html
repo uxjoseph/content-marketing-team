@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>마케팅 멀티 에이전트 운영 도구</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <main class="erp-shell">
+    <aside class="erp-sidebar">
+      <div class="erp-brand">마케팅 운영 ERP</div>
+      <nav class="erp-nav">
+        <a class="active" href="/">작업 대시보드</a>
+        <a href="/prompts">프롬프트 관리 ({{ prompts_count }})</a>
+      </nav>
+    </aside>
+    <section class="erp-main">
+      <header class="erp-topbar dash-topbar">
+        <div>
+          <p class="dash-kicker">운영 대시보드 / 마케팅 자동화</p>
+          <h1>마케팅 콘텐츠 생성 대시보드</h1>
+        </div>
+        <div class="dash-topbar-actions">
+          <span class="status-badge">로컬 무인증 PoC</span>
+          <a class="btn btn-secondary" href="/prompts">프롬프트 설정</a>
+        </div>
+      </header>
+      <div class="erp-content dashboard-content">
+          {% set status_labels = {
+            "PENDING": "대기",
+            "RUNNING": "실행 중",
+            "SUCCEEDED": "성공",
+            "PARTIAL_SUCCESS": "부분 성공",
+            "FAILED": "실패",
+            "CANCELED": "취소됨"
+          } %}
+          {% set target_labels = {
+            "newsletter": "뉴스레터",
+            "blog": "블로그 글",
+            "linkedin": "링크드인 포스트",
+            "thread": "스레드 포스트",
+            "youtube-script": "유튜브 스크립트",
+            "shorts-script": "쇼츠 스크립트",
+            "card-news": "카드뉴스",
+            "thumbnail": "썸네일",
+            "chart": "차트"
+          } %}
+
+          <section class="dash-hero shad-card">
+            <div>
+              <p class="dash-hero-eyebrow">캠페인 통합 운영 센터</p>
+              <h2>원고 입력부터 채널별 결과물까지 한 번에 생성</h2>
+              <p>Markdown 원문 1개로 텍스트, 카드뉴스, 썸네일, 차트, 쇼츠를 자동 생성합니다.</p>
+            </div>
+            <div class="dash-hero-meta">
+              <div class="hero-meta-item">
+                <span>기본 타겟</span>
+                <strong>{{ default_targets|length }}</strong>
+              </div>
+              <div class="hero-meta-item">
+                <span>프롬프트 템플릿</span>
+                <strong>{{ prompts_count }}</strong>
+              </div>
+            </div>
+        </section>
+
+        <section class="kpi-grid dash-kpi-grid">
+          <article class="kpi-card shad-card">
+            <div class="label">전체 작업 수</div>
+            <div class="value">{{ jobs|length }}</div>
+          </article>
+          <article class="kpi-card shad-card">
+            <div class="label">현재 기본 타겟</div>
+            <div class="value">{{ default_targets|length }}</div>
+          </article>
+          <article class="kpi-card shad-card">
+            <div class="label">프롬프트 템플릿</div>
+            <div class="value">{{ prompts_count }}</div>
+          </article>
+          <article class="kpi-card shad-card">
+            <div class="label">최근 작업 상태</div>
+            <div class="value">
+              {% if jobs|length > 0 %}{{ status_labels.get(jobs[0].status, jobs[0].status) }}{% else %}없음{% endif %}
+            </div>
+          </article>
+        </section>
+
+        <section class="dash-workspace">
+          <article class="card shad-card">
+            <div class="card-head">
+              <h2>신규 작업 생성</h2>
+              <span class="pill">새 작업</span>
+            </div>
+            <p>마케터용 원본 Markdown 글을 입력하면 멀티 에이전트 생성 파이프라인이 실행됩니다.</p>
+            <form id="job-form" class="form-grid">
+              <label for="source_markdown">원본 글 (Markdown)</label>
+              <textarea class="textarea shad-input" id="source_markdown" name="source_markdown" rows="12" placeholder="# 제목&#10;&#10;원본 마크다운 글을 입력하세요." required></textarea>
+
+              <div class="form-cols">
+                <div>
+                  <label for="tone">톤</label>
+                  <input class="input shad-input" id="tone" name="tone" type="text" value="친근하고 실용적, 실행 중심">
+                </div>
+                <div>
+                  <label for="language">언어</label>
+                  <small>예: ko, en, ja</small>
+                  <input class="input shad-input" id="language" name="language" type="text" value="ko">
+                </div>
+              </div>
+
+              <div>
+                <label>타겟 선택</label>
+                <small>최소 1개 이상 선택하세요.</small>
+                <div class="targets-grid targets-chip-grid">
+                  {% for target in target_options %}
+                  <label class="check target-chip">
+                    <input type="checkbox" name="targets" value="{{ target }}" {% if target in default_targets %}checked{% endif %}>
+                    <span>{{ target_labels.get(target, target) }}</span>
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <label class="check">
+                <input id="mock_mode" name="mock_mode" type="checkbox">
+                <span>시뮬레이션 모드 (외부 API 없이 흐름 점검)</span>
+              </label>
+
+              <button class="btn btn-primary" type="submit">생성 시작</button>
+            </form>
+            <p id="error" class="error"></p>
+          </article>
+
+          <article class="card shad-card side-panel">
+            <div class="card-head">
+              <h2>운영 가이드</h2>
+              <span class="pill pill-muted">운영 규칙</span>
+            </div>
+            <ul class="guide-list">
+              <li>원본 글은 반드시 Markdown으로 입력합니다.</li>
+              <li>카드뉴스/썸네일/차트는 분리 타겟으로 선택합니다.</li>
+              <li>실패 시 작업(Job) 단위 재시도는 1회만 허용됩니다.</li>
+              <li>결과물은 작업 상세 페이지에서 텍스트/이미지/영상 미리보기가 가능합니다.</li>
+            </ul>
+            <div class="card-head card-head-mini">
+              <h3>기본 선택 타겟</h3>
+            </div>
+            <div class="default-targets">
+              {% for target in default_targets %}
+              <span class="pill">{{ target_labels.get(target, target) }}</span>
+              {% endfor %}
+            </div>
+          </article>
+        </section>
+
+        <section class="card shad-card">
+          <div class="card-head">
+            <h2>최근 작업</h2>
+            <span class="pill pill-muted">최근 50건</span>
+          </div>
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th>작업 ID</th>
+                  <th>상태</th>
+                  <th>단계</th>
+                  <th>진행률</th>
+                  <th>생성 시각</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for job in jobs %}
+                <tr>
+                  <td><a href="/jobs/{{ job.id }}">{{ job.id }}</a></td>
+                  <td><span class="status-badge status-{{ job.status }}" title="{{ job.status }}">{{ status_labels.get(job.status, job.status) }}</span></td>
+                  <td>{{ job.current_stage or "-" }}</td>
+                  <td>{{ job.progress }}%</td>
+                  <td>{{ job.created_at }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("job-form");
+    const errorEl = document.getElementById("error");
+    const submitButton = form.querySelector("button[type='submit']");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorEl.textContent = "";
+      const formData = new FormData(form);
+      const targets = formData.getAll("targets");
+      const payload = {
+        source_markdown: formData.get("source_markdown"),
+        targets: targets,
+        tone: formData.get("tone"),
+        language: formData.get("language"),
+        mock_mode: document.getElementById("mock_mode").checked
+      };
+      if (!String(payload.source_markdown || "").trim()) {
+        errorEl.textContent = "원본 Markdown 글을 입력하세요.";
+        return;
+      }
+      if (targets.length === 0) {
+        errorEl.textContent = "타겟을 최소 1개 이상 선택하세요.";
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = "생성 중...";
+      const fieldLabel = {
+        source_markdown: "원본 글",
+        targets: "타겟",
+        tone: "톤",
+        language: "언어"
+      };
+
+      try {
+        const response = await fetch("/api/jobs", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({detail: "작업 생성에 실패했습니다."}));
+          if (Array.isArray(body.detail) && body.detail.length > 0) {
+            errorEl.textContent = body.detail
+              .map((item) => {
+                const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : "";
+                const label = fieldLabel[field] || field || "입력값";
+                return `${label}: ${item.msg || String(item)}`;
+              })
+              .join(" | ");
+          } else {
+            errorEl.textContent = body.detail || "작업 생성에 실패했습니다.";
+          }
+          return;
+        }
+        const data = await response.json();
+        window.location.href = `/jobs/${data.job_id}`;
+      } catch (_error) {
+        errorEl.textContent = "네트워크 오류로 작업 생성에 실패했습니다. 잠시 후 다시 시도하세요.";
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = "생성 시작";
+      }
+    });
+  </script>
+</body>
+</html>
